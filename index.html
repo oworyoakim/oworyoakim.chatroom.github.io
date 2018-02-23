@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <title>Test</title>
+    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta.3/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://code.jquery.com/jquery-3.2.1.min.js" integrity="sha256-hwg4gsxgFZhOsEEamdOYGBf13FyQuiTwlAQgxVSNgt4="
+        crossorigin="anonymous"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta.3/js/bootstrap.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta.3/js/bootstrap.bundle.min.js"></script>
+    <style>
+        .small-width {
+            /* width: 120px;
+            height: 120px; */
+            padding-right: 20px;
+            /* border-radius: 60%; */
+        }
+    </style>
+</head>
+
+<body style="padding-top: 50px;">
+    <div class="container">
+        <div class="row">
+            <div class="col">
+                <input name="name" id="name" class="form-control">
+            </div>
+            <div class="col">
+                <button id="btnOpenOrJoin" class="btn btn-success">Join</button>
+            </div>
+            <div class="col">
+                <button id="btnClose" class="btn btn-danger">Exit</button>
+            </div>
+        </div>
+        <hr />
+        <div class="row" id="videoContainer">
+        </div>
+    </div>
+    <script src="RTCMultiConnection.js"></script>
+    <script src="socket.io.js"></script>
+    <script src="adapter-latest.js"></script>
+    <script>
+        var connection = new RTCMultiConnection();
+        var roomId = 'kimzchatroom';
+        var stream = new MediaStream();
+        var btnOpenOrJoin = document.getElementById('btnOpenOrJoin');
+        var btnClose = document.getElementById('btnClose');
+        console.log(connection);
+
+        connection.socketURL = 'https://rtcmulticonnection.herokuapp.com:443/';
+
+        // if you want session with audio and video
+        connection.session = {
+            video: true,
+            audio: true
+        };
+
+        connection.bandwidth = {
+            video: 256, // 256kbps
+            // screen: 300, // 300kbps
+            audio: 128 // 128kbps
+        };
+
+        connection.sdpConstraints.mandatory = {
+            OfferToReceiveAudio: true,
+            OfferToReceiveVideo: true
+        };
+
+
+        btnOpenOrJoin.disabled = false;
+        btnClose.disabled = true;
+
+        btnOpenOrJoin.onclick = function () {
+            let name = $('#name').val();
+            if (name === '') {
+                alert('Name must be filled');
+                return;
+            }
+
+            $('#name').val('');
+
+            btnOpenOrJoin.disabled = true;
+            btnClose.disabled = false;
+
+            connection.checkPresence(roomId, (isRoomExists, roomid) => {
+                if (isRoomExists && roomId === roomid) {
+                    connection.join(roomId);
+                } else {
+                    connection.open(roomId);
+                }
+            });
+            connection.extra = {
+                name: name
+            };
+        };
+
+        btnClose.onclick = function () {
+            btnOpenOrJoin.disabled = false;
+            btnClose.disabled = true;
+            connection.leave();
+            let video = document.createElement('video');
+            video.remove();
+            if (stream) {
+                stream.getTracks().forEach((track) => {
+                    track.stop();
+                });
+            }
+            //location.reload();
+        };
+
+        connection.onstream = function (event) {
+            let divElement = document.createElement('div');
+            let video = event.mediaElement;
+            let heading = '<h3>' + event.extra.name + '</h3>';
+            if (event.type === 'local') {
+                video.muted = true;
+                stream = event.stream;
+            }
+            video.controls = true;
+            video.width = 360;
+            video.height = 240;
+            divElement.setAttribute('class', 'col-md-3 small-width');
+            divElement.setAttribute('id', event.streamid);
+            divElement.appendChild(video);
+            document.getElementById('videoContainer').appendChild(divElement);
+            document.getElementById(event.streamid).insertAdjacentHTML('afterbegin', heading);
+        };
+
+        connection.onstreamended = function (event) {
+            let mediaElement = document.getElementById(event.streamid);
+            if (mediaElement) {
+                mediaElement.parentNode.removeChild(mediaElement);
+            }
+        };
+    </script>
+
+</body>
+
+</html>
